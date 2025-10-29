@@ -1,0 +1,42 @@
+﻿# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+dist-react/
+out/
+build/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.local
+
+# Electron
+*.asar
+
+# Backups
+backups/
+
+# Installers
+*.exe
+*.msi
+*.nupkg
