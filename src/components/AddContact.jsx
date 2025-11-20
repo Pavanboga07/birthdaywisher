@@ -1,12 +1,62 @@
-import React, { useState } from 'react';
-import { X, Save, User, Calendar, Mail, Plus, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Save, User, Calendar, Mail, Plus, Trash2, FileText, Tag, AlertTriangle } from 'lucide-react';
 
 function AddContact({ onClose, onSuccess, editContact = null }) {
   const [formData, setFormData] = useState({
     name: editContact?.name || '',
     birthday: editContact?.birthday || '',
-    email: editContact?.email || ''
+    email: editContact?.email || '',
+    template_id: editContact?.template_id || null,
+    category: editContact?.category || 'Uncategorized'
   });
+
+  const [templates, setTemplates] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [newCategory, setNewCategory] = useState('');
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState(null);
+
+  useEffect(() => {
+    loadTemplates();
+    loadCategories();
+  }, []);
+
+  const loadTemplates = async () => {
+    const data = await window.electronAPI.getAllTemplates();
+    setTemplates(data);
+  };
+
+  const loadCategories = async () => {
+    const data = await window.electronAPI.getAllCategories();
+    // Add default categories
+    const defaultCategories = ['Uncategorized', '1st Year Students', '2nd Year Students', '3rd Year Students', '4th Year Students', 'Teachers', 'Family', 'Friends', 'Colleagues'];
+    const allCategories = [...new Set([...defaultCategories, ...data])];
+    setCategories(allCategories);
+  };
+
+  const checkForDuplicates = async (name, email) => {
+    if (!name || !email) return;
+    
+    const duplicates = await window.electronAPI.checkDuplicateContact(
+      name, 
+      email, 
+      editContact?.id
+    );
+    
+    if (duplicates.length > 0) {
+      setDuplicateWarning(duplicates[0]);
+    } else {
+      setDuplicateWarning(null);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      checkForDuplicates(formData.name, formData.email);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [formData.name, formData.email]);
 
   // Parse custom fields from notes/phone if editing
   const [customFields, setCustomFields] = useState(() => {
@@ -67,6 +117,17 @@ function AddContact({ onClose, onSuccess, editContact = null }) {
       return;
     }
 
+    // Check if user wants to proceed with duplicate
+    if (duplicateWarning && !editContact) {
+      const proceed = window.confirm(
+        `A contact with similar name or email already exists:\n\n` +
+        `Name: ${duplicateWarning.name}\n` +
+        `Email: ${duplicateWarning.email}\n\n` +
+        `Do you still want to add this contact?`
+      );
+      if (!proceed) return;
+    }
+
     try {
       // Build contact object with custom fields stored in phone/notes
       const contact = {
@@ -74,7 +135,9 @@ function AddContact({ onClose, onSuccess, editContact = null }) {
         birthday: formData.birthday,
         email: formData.email.trim(),
         phone: '',
-        notes: ''
+        notes: '',
+        template_id: formData.template_id,
+        category: formData.category
       };
 
       // Store custom fields
@@ -106,7 +169,7 @@ function AddContact({ onClose, onSuccess, editContact = null }) {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex items-center justify-between">
+        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex items-center justify-between z-10">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
             {editContact ? '✏️ Edit Contact' : '➕ Add New Contact'}
           </h2>
@@ -119,7 +182,7 @@ function AddContact({ onClose, onSuccess, editContact = null }) {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 relative z-0">
           {/* Name Field - Required */}
           <div>
             <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -129,6 +192,7 @@ function AddContact({ onClose, onSuccess, editContact = null }) {
             <input
               type="text"
               required
+              autoFocus
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className={`w-full px-4 py-3 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white`}
@@ -170,6 +234,113 @@ function AddContact({ onClose, onSuccess, editContact = null }) {
             {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               📧 Required for automatic birthday emails
+            </p>
+          </div>
+
+          {/* Duplicate Warning */}
+          {duplicateWarning && !editContact && (
+            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-300">
+                    ⚠️ Possible Duplicate Contact
+                  </p>
+                  <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
+                    Similar contact exists: <strong>{duplicateWarning.name}</strong> ({duplicateWarning.email})
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Category Selector */}
+          <div>
+            <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <Tag className="w-4 h-4 mr-2" />
+              Category
+            </label>
+            <div className="flex space-x-2">
+              <select
+                value={showNewCategory ? '__new__' : formData.category}
+                onChange={(e) => {
+                  if (e.target.value === '__new__') {
+                    setShowNewCategory(true);
+                  } else {
+                    setFormData({ ...formData, category: e.target.value });
+                    setShowNewCategory(false);
+                  }
+                }}
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              >
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+                <option value="__new__">+ Add New Category</option>
+              </select>
+            </div>
+            
+            {showNewCategory && (
+              <div className="flex space-x-2 mt-2">
+                <input
+                  type="text"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  placeholder="Enter new category name"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newCategory.trim()) {
+                      setCategories([...categories, newCategory.trim()]);
+                      setFormData({ ...formData, category: newCategory.trim() });
+                      setNewCategory('');
+                      setShowNewCategory(false);
+                    }
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Add
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNewCategory(false);
+                    setNewCategory('');
+                  }}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+            
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              🏷️ Organize contacts by year of study, role, or custom categories
+            </p>
+          </div>
+
+          {/* Email Template Selector */}
+          <div>
+            <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <FileText className="w-4 h-4 mr-2" />
+              Email Template (Optional)
+            </label>
+            <select
+              value={formData.template_id || ''}
+              onChange={(e) => setFormData({ ...formData, template_id: e.target.value ? parseInt(e.target.value) : null })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            >
+              <option value="">Use Default Template</option>
+              {templates.map(template => (
+                <option key={template.id} value={template.id}>
+                  {template.name} {template.is_default === 1 ? '(Default)' : ''}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              ✉️ Choose a specific template for this contact or leave blank to use default
             </p>
           </div>
 

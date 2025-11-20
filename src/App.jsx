@@ -38,11 +38,15 @@ function App() {
             {/* Logo and Title */}
             <div className="flex items-center space-x-3">
               <div className="bg-gradient-to-br from-purple-500 to-pink-500 p-2 rounded-lg">
-                <span className="text-3xl">🎂</span>
+                <img 
+                  src="/wishmailer.jpeg" 
+                  alt="WishMailer Logo" 
+                  className="w-8 h-8 object-contain"
+                />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
-                  Birthday Reminder
+                  WishMailer
                 </h1>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Never forget a birthday again
@@ -118,7 +122,7 @@ function App() {
       <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-12">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-            <p>© 2025 Birthday Reminder. Made with ❤️</p>
+            <p>© 2025 WishMailer. Made with ❤️</p>
             <div className="flex items-center space-x-4">
               <span className="flex items-center space-x-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>

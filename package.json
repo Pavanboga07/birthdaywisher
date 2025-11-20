@@ -1,29 +1,22 @@
 {
-  "name": "birthday-reminder",
+  "name": "wishmailer",
   "version": "1.0.0",
-  "description": "Desktop Birthday Reminder Application",
+  "description": "Desktop Birthday Email Reminder Application",
   "main": "electron/main.js",
-  "author": "Your Name",
+  "author": "Parshuram Boga",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Pavanboga07/birthdaywisher.git"
-  },
   "scripts": {
     "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
     "build": "vite build",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win --x64",
-    "publish": "npm run build && electron-builder --win --x64 --publish always"
+    "dist:win": "npm run build && electron-builder --win --x64"
   },
   "dependencies": {
     "auto-launch": "^5.0.6",
     "better-sqlite3": "^9.6.0",
     "date-fns": "^3.0.0",
-    "electron-store": "^8.1.0",
-    "electron-updater": "^6.6.2",
-    "lucide-react": "^0.400.0",
+    "electron-updater": "^6.1.7",
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.13",
     "react": "^18.2.0",
@@ -38,6 +31,7 @@
     "electron": "^30.0.0",
     "electron-builder": "^24.13.3",
     "electron-rebuild": "^3.2.9",
+    "lucide-react": "^0.400.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
     "vite": "^5.2.11",

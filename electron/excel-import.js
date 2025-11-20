@@ -19,13 +19,17 @@ function importFromExcel(filePath) {
       const email = row.Email || row.email || row.EMAIL || '';
       const phone = row.Phone || row.phone || row.PHONE || row.Mobile || row.mobile || '';
       const notes = row.Notes || row.notes || row.NOTES || '';
+      const category = row.Category || row.category || row.CATEGORY || 'Uncategorized';
+      const templateId = row['Template ID'] || row['template id'] || row.template_id || null;
       
       return {
         name: name.trim(),
         birthday,
         email: email.trim(),
         phone: phone.trim(),
-        notes: notes.trim()
+        notes: notes.trim(),
+        category: category.trim(),
+        template_id: templateId
       };
     }).filter(contact => contact.name && contact.birthday); // Only valid entries
     
@@ -121,13 +125,24 @@ function exportToExcel(contacts, filePath) {
 function generateTemplate(filePath) {
   try {
     const templateData = [
-      { Name: 'John Doe', Birthday: '1990-01-15', Email: 'john@example.com', Phone: '+1234567890', Notes: 'Friend from college' },
-      { Name: 'Jane Smith', Birthday: '1985-05-20', Email: 'jane@example.com', Phone: '+0987654321', Notes: 'Work colleague' }
+      { Name: 'John Doe', Birthday: '1990-01-15', Email: 'john@example.com', Phone: '+1234567890', Category: 'Friends', Notes: 'Friend from college', 'Template ID': '' },
+      { Name: 'Jane Smith', Birthday: '1985-05-20', Email: 'jane@example.com', Phone: '+0987654321', Category: 'Work', Notes: 'Work colleague', 'Template ID': '' }
     ];
     
     const worksheet = XLSX.utils.json_to_sheet(templateData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Contacts');
+    
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 20 }, // Name
+      { wch: 12 }, // Birthday
+      { wch: 25 }, // Email
+      { wch: 15 }, // Phone
+      { wch: 15 }, // Category
+      { wch: 30 }, // Notes
+      { wch: 12 }  // Template ID
+    ];
     
     XLSX.writeFile(workbook, filePath);
     return { success: true };

@@ -1,6 +1,8 @@
 const cron = require('node-cron');
-const { getTodaysBirthdays, getUpcomingBirthdays, getSetting } = require('./database');
-const { sendBirthdayEmail, initializeEmailService } = require('./email');
+const { getTodaysBirthdays, getUpcomingBirthdays, getSetting, recordBirthday } = require('./database');
+const { initializeEmailService } = require('./email');
+const emailQueue = require('./email-queue');
+const emailTemplates = require('./email-templates');
 const { Notification } = require('electron');
 
 let scheduledTask = null;
@@ -32,6 +34,10 @@ function startScheduler() {
   console.log(`Scheduler started - will run daily at ${notificationTime}`);
   console.log('Notification checker running hourly');
   
+  // Start email queue processor
+  emailQueue.startProcessing();
+  console.log('Email queue processor started');
+  
   // Run immediate check on startup
   setTimeout(() => {
     sendUpcomingBirthdayNotifications();
@@ -50,42 +56,39 @@ async function checkAndSendBirthdayEmails() {
   
   console.log(`Found ${birthdays.length} birthdays today`);
   
+  let queued = 0;
+  let skipped = 0;
+  
   for (const contact of birthdays) {
     if (contact.email) {
-      console.log(`Sending birthday email to ${contact.name}...`);
-      const result = await sendBirthdayEmail(contact);
+      // Generate email with beautiful universal template
+      const emailContent = emailTemplates.generateBirthdayEmail(contact);
+      
+      // Add to queue instead of sending directly
+      const result = emailQueue.addToQueue(contact, emailContent.subject, emailContent.html, 1);
       
       if (result.success) {
-        console.log(`✓ Email sent to ${contact.name}`);
-        
-        // Show success notification
-        new Notification({
-          title: '🎉 Birthday Email Sent',
-          body: `Birthday wishes sent to ${contact.name}!`,
-          icon: require('path').join(__dirname, '../public/icon.png')
-        }).show();
+        queued++;
+        console.log(`✓ Queued birthday email for ${contact.name}`);
       } else {
-        console.error(`✗ Failed to send email to ${contact.name}:`, result.error);
-        
-        // Retry mechanism - wait 5 minutes and try again
-        setTimeout(async () => {
-          console.log(`Retrying email to ${contact.name}...`);
-          const retryResult = await sendBirthdayEmail(contact);
-          if (retryResult.success) {
-            console.log(`✓ Retry successful for ${contact.name}`);
-          } else {
-            console.error(`✗ Retry failed for ${contact.name}`);
-            
-            // Show error notification
-            new Notification({
-              title: '❌ Email Failed',
-              body: `Failed to send birthday email to ${contact.name}`,
-              icon: require('path').join(__dirname, '../public/icon.png')
-            }).show();
-          }
-        }, 5 * 60 * 1000); // 5 minutes
+        skipped++;
+        console.log(`✗ Failed to queue email for ${contact.name}`);
       }
+      
+      // Record birthday in analytics
+      recordBirthday();
+    } else {
+      skipped++;
+      console.log(`⊘ Skipped ${contact.name} (no email address)`);
     }
+  }
+  
+  if (queued > 0) {
+    new Notification({
+      title: '📧 Birthday Emails Queued',
+      body: `${queued} beautiful birthday email(s) ready to send! ${skipped > 0 ? `${skipped} skipped.` : ''}`,
+      icon: require('path').join(__dirname, '../public/wishmailer.jpeg')
+    }).show();
   }
 }
 
@@ -99,7 +102,7 @@ async function sendUpcomingBirthdayNotifications() {
     new Notification({
       title: '🎂 Birthday Today!',
       body: `Today is ${names}'s birthday! Don't forget to wish them!`,
-      icon: require('path').join(__dirname, '../public/icon.png')
+      icon: require('path').join(__dirname, '../public/wishmailer.jpeg')
     }).show();
   }
   
@@ -110,7 +113,7 @@ async function sendUpcomingBirthdayNotifications() {
     new Notification({
       title: '📅 Birthday Tomorrow',
       body: `${names}'s birthday is tomorrow!`,
-      icon: require('path').join(__dirname, '../public/icon.png')
+      icon: require('path').join(__dirname, '../public/wishmailer.jpeg')
     }).show();
   }
 }
@@ -124,6 +127,10 @@ function stopScheduler() {
     notificationTask.stop();
     console.log('Notification scheduler stopped');
   }
+  
+  // Stop email queue processor
+  emailQueue.stopProcessing();
+  console.log('Email queue processor stopped');
 }
 
 module.exports = {

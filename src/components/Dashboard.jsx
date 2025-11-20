@@ -9,9 +9,15 @@ function Dashboard() {
   const [allContacts, setAllContacts] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [sending, setSending] = useState(false);
+  const [analytics, setAnalytics] = useState({
+    today: { sent: 0, failed: 0, pending: 0 },
+    week: { sent: 0, failed: 0, pending: 0 },
+    month: { sent: 0, failed: 0, pending: 0 }
+  });
 
   useEffect(() => {
     loadData();
+    loadAnalytics();
   }, []);
 
   const loadData = async () => {
@@ -22,6 +28,40 @@ function Dashboard() {
     setTodaysBirthdays(today);
     setUpcomingBirthdays(upcoming);
     setAllContacts(all);
+  };
+
+  const loadAnalytics = async () => {
+    try {
+      const [summary, queueStats] = await Promise.all([
+        window.electronAPI.getAnalyticsSummary(),
+        window.electronAPI.getQueueStats()
+      ]);
+      
+      console.log('Analytics summary:', summary);
+      console.log('Queue stats:', queueStats);
+      
+      if (summary) {
+        setAnalytics({
+          today: {
+            sent: summary.currentMonth?.emailsSent || 0,
+            failed: summary.currentMonth?.emailsFailed || 0,
+            pending: queueStats?.pending || 0
+          },
+          week: {
+            sent: summary.last7Days?.emailsSent || 0,
+            failed: summary.last7Days?.emailsFailed || 0,
+            pending: queueStats?.pending || 0
+          },
+          month: {
+            sent: summary.currentMonth?.emailsSent || 0,
+            failed: summary.currentMonth?.emailsFailed || 0,
+            pending: queueStats?.pending || 0
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load analytics:', error);
+    }
   };
 
   const sendAllTodayEmails = async () => {
@@ -110,6 +150,69 @@ function Dashboard() {
             <Plus className="w-5 h-5" />
             <span>Add Contact</span>
           </button>
+        </div>
+      </div>
+
+      {/* Email Analytics Summary */}
+      <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl shadow-lg p-6 mb-6">
+        <h3 className="text-xl font-bold text-white mb-4">📊 Email Statistics</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Today */}
+          <div className="bg-white bg-opacity-20 backdrop-blur-sm rounded-lg p-4">
+            <h4 className="text-white font-semibold mb-2">Today</h4>
+            <div className="space-y-1 text-white">
+              <div className="flex justify-between">
+                <span className="text-sm opacity-90">Sent:</span>
+                <span className="font-bold">{analytics.today.sent}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm opacity-90">Failed:</span>
+                <span className="font-bold">{analytics.today.failed}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm opacity-90">Pending:</span>
+                <span className="font-bold">{analytics.today.pending}</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* This Week */}
+          <div className="bg-white bg-opacity-20 backdrop-blur-sm rounded-lg p-4">
+            <h4 className="text-white font-semibold mb-2">This Week</h4>
+            <div className="space-y-1 text-white">
+              <div className="flex justify-between">
+                <span className="text-sm opacity-90">Sent:</span>
+                <span className="font-bold">{analytics.week.sent}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm opacity-90">Failed:</span>
+                <span className="font-bold">{analytics.week.failed}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm opacity-90">Pending:</span>
+                <span className="font-bold">{analytics.week.pending}</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* This Month */}
+          <div className="bg-white bg-opacity-20 backdrop-blur-sm rounded-lg p-4">
+            <h4 className="text-white font-semibold mb-2">This Month</h4>
+            <div className="space-y-1 text-white">
+              <div className="flex justify-between">
+                <span className="text-sm opacity-90">Sent:</span>
+                <span className="font-bold">{analytics.month.sent}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm opacity-90">Failed:</span>
+                <span className="font-bold">{analytics.month.failed}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm opacity-90">Pending:</span>
+                <span className="font-bold">{analytics.month.pending}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

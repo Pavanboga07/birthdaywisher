@@ -6,7 +6,7 @@ let autoLauncher;
 
 function initAutoLaunch() {
   autoLauncher = new AutoLaunch({
-    name: 'Birthday Reminder',
+    name: 'WishMailer',
     path: app.getPath('exe'),
     isHidden: false // Set to true to start minimized
   });

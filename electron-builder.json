@@ -1,23 +1,26 @@
 {
-  "appId": "com.birthdayreminder.app",
-  "productName": "Birthday Reminder",
+  "appId": "com.wishmailer.app",
+  "productName": "WishMailer",
+  "asar": false,
   "directories": {
     "output": "dist"
   },
   "files": [
-    "dist-react/**/*",
+    "package.json",
     "electron/**/*",
-    "package.json"
+    "dist-react/**/*",
+    "node_modules/**/*",
+    "public/wishmailer.jpeg"
   ],
   "win": {
-    "target": ["nsis"],
-    "icon": "public/icon.png"
+    "target": "nsis",
+    "icon": "public/wishmailer.jpeg"
   },
   "nsis": {
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "Birthday Reminder"
+    "shortcutName": "WishMailer"
   }
 }

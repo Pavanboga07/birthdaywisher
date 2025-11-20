@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
-const { getSetting, logEmail } = require('./database');
+const { getSetting, logEmail, getTemplate, getDefaultTemplate } = require('./database');
+const emailTemplates = require('./email-templates');
 
 let transporter = null;
 
@@ -38,125 +39,125 @@ async function sendBirthdayEmail(contact) {
 
   try {
     const emailFrom = getSetting('emailFrom');
-    const template = getSetting('emailTemplate') || 'Happy Birthday {name}! 🎂';
-    const message = template.replace('{name}', contact.name);
+    
+    // 1. Try to get assigned template or default template
+    let template = null;
+    if (contact.template_id) {
+      template = getTemplate(contact.template_id);
+    }
+    
+    if (!template) {
+      template = getDefaultTemplate();
+    }
 
-    const mailOptions = {
-      from: emailFrom,
-      to: contact.email,
-      subject: `Happy Birthday ${contact.name}! 🎉`,
-      text: message,
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px;">
-          <h1 style="margin: 0 0 20px 0;">🎂 ${message}</h1>
-          <p style="font-size: 16px; margin: 0;">Have a wonderful day filled with joy and happiness!</p>
-        </div>
-      `
-    };
+    let mailOptions = {};
+
+    if (template) {
+      // FIX: Check if message is actually a JSON string (legacy/bugged save)
+      if (template.message && template.message.trim().startsWith('{"type":"visual"')) {
+        try {
+          const parsed = JSON.parse(template.message);
+          if (parsed.type === 'visual' && parsed.html) {
+            template.type = 'visual';
+            template.html = parsed.html;
+            template.config = parsed.config;
+            // Construct a fallback text message from the config
+            if (parsed.config) {
+               template.message = `${parsed.config.greeting || 'Happy Birthday'}, {name}!\n\n${parsed.config.mainMessage || ''}\n\n${parsed.config.footerMessage || ''}`;
+            }
+          }
+        } catch (e) {
+          console.error('Failed to parse legacy visual template message:', e);
+        }
+      }
+
+      // Use the found template
+      let subject = template.subject;
+      let htmlContent = '';
+      let textContent = '';
+
+      // Calculate age
+      let age = '';
+      if (contact.birthday) {
+        const birthYear = parseInt(contact.birthday.split('-')[0]);
+        if (birthYear > 1900 && birthYear < new Date().getFullYear()) {
+          age = new Date().getFullYear() - birthYear;
+        }
+      }
+
+      // Replace placeholders
+      subject = subject.replace(/\{name\}/g, contact.name).replace(/\{age\}/g, age);
+
+      let attachments = [];
+
+      if (template.type === 'visual' && template.html) {
+        // Visual template
+        htmlContent = template.html
+          .replace(/\{name\}/g, contact.name)
+          .replace(/\{age\}/g, age);
+        
+        textContent = template.message 
+          ? template.message.replace(/\{name\}/g, contact.name).replace(/\{age\}/g, age)
+          : `Happy Birthday ${contact.name}!`;
+      } else {
+        // Text template - wrap in default styling
+        const message = template.message
+          .replace(/\{name\}/g, contact.name)
+          .replace(/\{age\}/g, age);
+        
+        textContent = message;
+        htmlContent = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px; text-align: center;">
+              <h1 style="margin: 0 0 20px 0; font-size: 32px;">🎂 ${subject}</h1>
+              <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 8px; margin-top: 20px;">
+                <p style="font-size: 18px; line-height: 1.6; margin: 0; white-space: pre-wrap;">${message}</p>
+              </div>
+              <div style="margin-top: 30px; font-size: 40px;">
+                🎉 🎈 🎁 🎊
+              </div>
+            </div>
+            <div style="text-align: center; padding: 20px; color: #666; font-size: 12px;">
+              <p>Sent with love from Birthday Reminder App</p>
+            </div>
+          </div>
+        `;
+      }
+
+      mailOptions = {
+        from: emailFrom,
+        to: contact.email,
+        subject: subject,
+        text: textContent,
+        html: htmlContent,
+        attachments: attachments
+      };
+      
+      console.log(`Using template: ${template.name} (${template.type || 'text'})`);
+
+    } else {
+      // Fallback to default template
+      const emailContent = emailTemplates.generateBirthdayEmail(contact);
+
+      mailOptions = {
+        from: emailFrom,
+        to: contact.email,
+        subject: emailContent.subject,
+        text: emailContent.text,
+        html: emailContent.html
+      };
+      
+      console.log(`Using legacy theme: ${emailTheme}`);
+    }
 
     await transporter.sendMail(mailOptions);
     logEmail(contact.id, 'sent');
+    
+    // Update last contact date
+    const { updateLastContactDate } = require('./database');
+    updateLastContactDate(contact.id);
     
     console.log(`✓ Birthday email sent to ${contact.name}`);
-    return { success: true };
-  } catch (error) {
-    console.error('Email send error:', error);
-    logEmail(contact.id, 'failed', error.message);
-    return { success: false, error: error.message };
-  }
-}
-
-async function sendBirthdayEmailWithTemplate(contact, templateId = null) {
-  if (!transporter) {
-    const initialized = initializeEmailService();
-    if (!initialized) {
-      return { success: false, error: 'Email not configured' };
-    }
-  }
-
-  if (!contact.email) {
-    return { success: false, error: 'No email address for contact' };
-  }
-
-  try {
-    const emailFrom = getSetting('emailFrom');
-    
-    // Get template
-    let template;
-    if (templateId) {
-      // Get specific template by ID
-      const Database = require('better-sqlite3');
-      const path = require('path');
-      const { app } = require('electron');
-      const dbPath = path.join(app.getPath('userData'), 'birthdays.db');
-      const db = new Database(dbPath);
-      
-      const stmt = db.prepare('SELECT * FROM message_templates WHERE id = ?');
-      template = stmt.get(templateId);
-      db.close();
-    } else {
-      // Get default template
-      const Database = require('better-sqlite3');
-      const path = require('path');
-      const { app } = require('electron');
-      const dbPath = path.join(app.getPath('userData'), 'birthdays.db');
-      const db = new Database(dbPath);
-      
-      const stmt = db.prepare('SELECT * FROM message_templates WHERE is_default = 1 LIMIT 1');
-      template = stmt.get();
-      db.close();
-    }
-    
-    // Fallback to simple template if none found
-    if (!template) {
-      template = {
-        subject: 'Happy Birthday {name}! 🎉',
-        message: 'Happy Birthday {name}! 🎂 Wishing you an amazing day!'
-      };
-    }
-    
-    // Replace placeholders
-    const subject = template.subject.replace(/\{name\}/g, contact.name);
-    const message = template.message.replace(/\{name\}/g, contact.name);
-    
-    // Calculate age if birthday year is available
-    let age = '';
-    if (contact.birthday) {
-      const birthYear = parseInt(contact.birthday.split('-')[0]);
-      if (birthYear > 1900 && birthYear < new Date().getFullYear()) {
-        age = new Date().getFullYear() - birthYear;
-      }
-    }
-    
-    const finalMessage = message.replace(/\{age\}/g, age);
-
-    const mailOptions = {
-      from: emailFrom,
-      to: contact.email,
-      subject: subject,
-      text: finalMessage,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px; text-align: center;">
-            <h1 style="margin: 0 0 20px 0; font-size: 32px;">🎂 ${subject}</h1>
-            <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 8px; margin-top: 20px;">
-              <p style="font-size: 18px; line-height: 1.6; margin: 0; white-space: pre-wrap;">${finalMessage}</p>
-            </div>
-            <div style="margin-top: 30px; font-size: 40px;">
-              🎉 🎈 🎁 🎊
-            </div>
-          </div>
-          <div style="text-align: center; padding: 20px; color: #666; font-size: 12px;">
-            <p>Sent with love from Birthday Reminder App</p>
-          </div>
-        </div>
-      `
-    };
-
-    await transporter.sendMail(mailOptions);
-    logEmail(contact.id, 'sent');
-    
-    console.log(`✓ Birthday email sent to ${contact.name} using template`);
     return { success: true };
   } catch (error) {
     console.error('Email send error:', error);
@@ -218,7 +219,6 @@ function resetEmailService() {
 module.exports = {
   initializeEmailService,
   sendBirthdayEmail,
-  sendBirthdayEmailWithTemplate,
   testEmail,
   resetEmailService
 };

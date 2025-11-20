@@ -6,8 +6,7 @@ function Settings() {
     emailFrom: '',
     emailPassword: '',
     notificationTime: '09:00',
-    emailEnabled: false,
-    emailTemplate: ''
+    emailEnabled: false
   });
   const [showPassword, setShowPassword] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -25,8 +24,7 @@ function Settings() {
       emailFrom: allSettings.emailFrom || '',
       emailPassword: allSettings.emailPassword || '',
       notificationTime: allSettings.notificationTime || '09:00',
-      emailEnabled: allSettings.emailEnabled === 'true',
-      emailTemplate: allSettings.emailTemplate || 'Happy Birthday {name}! 🎂 Wishing you an amazing day!'
+      emailEnabled: allSettings.emailEnabled === 'true'
     });
   };
 
@@ -40,7 +38,6 @@ function Settings() {
     await window.electronAPI.setSetting('emailPassword', settings.emailPassword);
     await window.electronAPI.setSetting('notificationTime', settings.notificationTime);
     await window.electronAPI.setSetting('emailEnabled', String(settings.emailEnabled));
-    await window.electronAPI.setSetting('emailTemplate', settings.emailTemplate);
     
     alert('Settings saved successfully!');
   };
@@ -282,34 +279,6 @@ function Settings() {
             <TestTube className="w-5 h-5" />
             <span>{testing ? 'Sending...' : 'Send Test Email'}</span>
           </button>
-        </div>
-
-        {/* Email Template */}
-        <div className="space-y-4 mb-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">
-            ✉️ Default Email Template
-          </h3>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Message (use {'{name}'} as placeholder)
-            </label>
-            <textarea
-              value={settings.emailTemplate}
-              onChange={(e) => setSettings({ ...settings, emailTemplate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              rows="4"
-              placeholder="Happy Birthday {name}! 🎂"
-            />
-            <div className="mt-2 p-3 bg-purple-50 dark:bg-purple-900 rounded-lg">
-              <p className="text-sm text-purple-800 dark:text-purple-200">
-                <strong>Preview:</strong> {settings.emailTemplate.replace('{name}', 'John Doe')}
-              </p>
-            </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              💡 Tip: Go to the Templates page to create multiple custom templates
-            </p>
-          </div>
         </div>
 
         {/* Save Button */}
